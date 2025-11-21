@@ -1,0 +1,40 @@
+services:
+  cli:
+    image: ${PYTHON_IMAGE}
+    container_name: ${CLI_CONTAINER_NAME}
+    working_dir: /app
+    environment:
+      - CLI_COMMAND=${CLI_COMMAND}
+    command: >
+      sh -c "
+      mkdir -p /deps &&
+      if [ -f /app/requirements.txt ]; then
+        pip install --no-cache-dir --upgrade -r requirements.txt --target /deps
+      fi &&
+      export PYTHONPATH=/deps:\$PYTHONPATH &&
+      echo 'Running CLI: ' \"\$CLI_COMMAND\" &&
+      \$CLI_COMMAND &&
+      echo 'CLI finished. Keeping container alive...' &&
+      tail -f /dev/null
+      "
+    volumes:
+      - ./app:/app          # your code + requirements.txt
+      - cli_deps:/deps      # persistent Python deps
+      - cli_data:/data      # persistent output files
+    restart: unless-stopped
+
+  webdav:
+    image: bytemark/webdav
+    container_name: ${WEBDAV_CONTAINER_NAME}
+    environment:
+      - AUTH_TYPE=Basic
+      - USERNAME=${WEBDAV_USERNAME}
+      - PASSWORD=${WEBDAV_PASSWORD}
+    volumes:
+      - cli_data:/var/lib/dav   # same data the CLI writes to
+    # No ports here; Dokploy/Traefik will expose this service via domain
+    restart: unless-stopped
+
+volumes:
+  cli_deps:
+  cli_data:
